@@ -1,0 +1,72 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    volumes:
+      - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
+      - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - xray-network
+
+  mongodb:
+    image: mongo
+    container_name: mongodb
+    ports:
+      - '27017:27017'
+    volumes:
+      - xray-db:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - xray-network
+
+  xray-producer:
+    build:
+      context: ./xray-producer
+      dockerfile: Dockerfile
+    container_name: xray-producer
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    ports:
+      - '3000:3000'
+    depends_on:
+      - rabbitmq
+    networks:
+      - xray-network
+
+  xray-process:
+    build:
+      context: ./xray-process
+      dockerfile: Dockerfile
+    container_name: xray-process
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - MONGODB_URL=mongodb://mongodb:27017/xray
+      - PORT=3001
+    ports:
+      - '3001:3001'
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - xray-network
+
+networks:
+  xray-network:
+    driver: bridge
+
+volumes:
+  xray-db:

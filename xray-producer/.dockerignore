@@ -1,0 +1,10 @@
+# dependencies
+/node_modules
+/dist
+
+# misc
+.DS_Store
+.dockerignore
+Dockerfile
+/npm-debug.log
+/yarn-error.log
